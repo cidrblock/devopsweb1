@@ -69,7 +69,7 @@
   - name: Copying the upgrade result to file
     template:
      src: firmware.j2
-     dest: "/root/brocade/ansible-fos-command/firmware-{{ item }}"
+     dest: "/root/brocade/ansible-fos-command/firmware-{{ ip_addr }}"
     become: true
     delegate_to: localhost
 
