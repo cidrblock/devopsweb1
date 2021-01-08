@@ -1,0 +1,21 @@
+- hosts: localhost
+  gather_facts: False
+  vars:
+    ftp_server: 42.159.176.15
+  vars_prompt:
+  - name: ip_addr
+    prompt: Please enter the switch name
+    private: no
+
+  - name: username
+    prompt: Enter the user name
+    private: no
+
+  - name: password
+    prompt: Enter the password
+    private: yes
+
+  tasks:
+  - name: Include the brocade upgrade role
+    include_role:
+      name: brocade_upgrade
