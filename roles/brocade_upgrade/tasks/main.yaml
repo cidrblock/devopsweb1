@@ -1,0 +1,58 @@
+- name: Retrieve the current firmware
+  brocade_fos_command:
+    switch_login: "{{ username }}"
+    switch_password: "{{ password }}"
+    switch_address: "{{ ip_addr }}"
+    command_set:
+    - command: firmwareshow
+  register: firmwareshow_output
+
+# - set_fact:
+#     firmwareshow_output:
+#       results:
+#       - messages:
+#         - LS1R-N-11-01:sa042491> firmwareshow
+#         - Appl     Primary/Secondary Versions
+#         - ------------------------------------------
+#         - FOS      v7.4.2d
+#         -          v7.4.2d
+
+- name: Parse the firmwareshow output 
+  ansible.netcommon.cli_parse:
+    text: "{{ firmwareshow_output['results'][0]['messages']|join('\n') }}"
+    parser:
+      name: ansible.netcommon.native
+      template_path: "{{ role_path }}/templates/brocade_firmware.yaml"
+  register: parsed_firmwareshow
+
+- debug:
+    var: parsed_firmwareshow
+
+- name: Build the command to run
+  set_fact:
+    command: "firmwaredownload -p ftp {{ ftp_server }},anonymous,/BrocadeFirmware/{{ new_version }}/{{ new_version }},'upgradefirmware'"
+  vars:
+    current: "{{ parsed_firmwareshow['parsed']['version'] }}"
+    new_version: "{{ upgrade_path[current] }}"
+    upgrade_path:
+      v7.4.2d: "v7.4.2g"
+
+- debug:
+    var: command
+
+- name: Update firmware
+  brocade_fos_command:
+    switch_login: "{{ username }}"
+    switch_password: "{{ password }}"
+    switch_address: "{{ ip_addr }}"
+    command_set:
+    - command: "{{ command }}" 
+      prompts:
+      - question: Do you want to continue
+        response: "Y"
+      exit_tests:
+        - Failed
+        - failed
+        - Rebooting
+        - rebooting
+      timeout: 60
