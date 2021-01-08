@@ -27,32 +27,66 @@
 
 - debug:
     var: parsed_firmwareshow
-
-- name: Build the command to run
+  
+- name: Set some vars
   set_fact:
-    command: "firmwaredownload -p ftp {{ ftp_server }},anonymous,/BrocadeFirmware/{{ new_version }}/{{ new_version }},'upgradefirmware'"
-  vars:
     current: "{{ parsed_firmwareshow['parsed']['version'] }}"
-    new_version: "{{ upgrade_path[current] }}"
-    upgrade_path:
-      v7.4.2d: "v7.4.2g"
+ 
+- name: Upgrade if we have a path
+  block:
+  - name: Build the command to run
+    set_fact:
+      command: "firmwaredownload -p ftp {{ ftp_server }},anonymous,/BrocadeFirmware/{{ new_version }}/{{ new_version }},'upgradefirmware'"
+    vars:
+      new_version: "{{ upgrade_path[current] }}"
+  
+  - name: Show the command to be run
+    debug:
+      var: command
+    
+  - name: Update firmware
+    brocade_fos_command:
+      switch_login: "{{ username }}"
+      switch_password: "{{ password }}"
+      switch_address: "{{ ip_addr }}"
+      command_set:
+      - command: "{{ command }}" 
+        prompts:
+        - question: Do you want to continue
+          response: "Y"
+        exit_tests:
+          - Failed
+          - failed
+          - Rebooting
+          - rebooting
+        timeout: 60
+    register: upgrade_result
+  
+  - name: Show the upgrade result
+    debug:
+      var: upgrade_result
 
-- debug:
-    var: command
+  - name: Copying the upgrade result to file
+    template:
+     src: firmware.j2
+     dest: "/root/brocade/ansible-fos-command/firmware-{{ item }}"
+    become: true
+    delegate_to: localhost
 
-- name: Update firmware
-  brocade_fos_command:
-    switch_login: "{{ username }}"
-    switch_password: "{{ password }}"
-    switch_address: "{{ ip_addr }}"
-    command_set:
-    - command: "{{ command }}" 
-      prompts:
-      - question: Do you want to continue
-        response: "Y"
-      exit_tests:
-        - Failed
-        - failed
-        - Rebooting
-        - rebooting
-      timeout: 60
+  when: current in upgrade_path
+
+
+- name: Notify if no upgrade path exists
+  block:
+  - debug:
+      msg: "No upgrade path available from {{ current }}"
+
+  when: current not in upgrade_path
+
+    
+
+
+  
+
+      
+
