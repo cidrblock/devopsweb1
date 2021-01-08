@@ -1,0 +1,90 @@
+---
+- hosts: localhost
+  gather_facts: False
+  vars_prompt:
+  - name: ip_addr
+    prompt: Please enter the switch name
+    private: no
+
+  - name: username
+    prompt: Enter the user name
+    private: no
+
+  - name: password
+    prompt: Enter the password
+    private: yes
+
+  tasks:
+
+  - include_vars:
+      file: result.json
+      name: output
+
+  - name: firmwareshow command
+    brocade_fos_command:
+      switch_login: "{{ username }}"
+      switch_password: "{{ password }}"
+      switch_address: "{{ item }}"
+      command_set:
+        #
+       - command: firmwareshow
+          text: "{{ output['results'][0]['messages']|join('\n') }}"
+       parser:
+         name: ansible.netcommon.native
+         template_path: "{{ playbook_dir }}/brocade_fos.yaml"
+    register: result
+
+    register: firmwareshow
+    with_items: "{{ ip_addr.split(' ') }}"
+
+  - set_fact:
+      upgrade_paths:
+      "v7.4.2d": "7.4.2f"
+        "v8.2.1c": "8.2.1f"
+
+  - set_fact:
+      new_version: "{{ desired }}"
+    vars:
+      current: "{{ result['parsed']['version'] }}"
+      desired: "{{ upgrade_paths[current]|default('dunno') }}"
+  - debug:
+      msg: "installing {{ new_version }}"
+
+  - name: Debugging the firmwareshow
+    debug:
+      var: firmwareshow
+
+  - name: Update firmware
+    brocade_fos_command:
+      switch_login: "{{ username }}"
+      switch_password: "{{ password }}"
+      switch_address: "{{ item }}"
+      command_set:
+        #
+        - command: firmwaredownload -p ftp 42.159.176.15,anonymous,/BrocadeFirmware/v7.4.2d/v7.4.2d,'upgradefirmware'
+          prompts:
+            - question: Do you want to continue
+              response: "Y"
+          exit_tests:
+            - Failed
+            - failed
+            - Rebooting
+            - rebooting
+          timeout: 60
+
+    register: configout
+#    with_items: "{{ ip_addr.split(' ') }}"
+#    when: "'v7.4.2d' in firmwareshow.messages|join('')"
+- name: print ansible_facts gathered
+    debug:
+      var: configout
+
+
+  - name: Copying the data to file
+    template:
+     src: firmware.j2
+     dest: "/root/brocade/ansible-fos-command/firmware-{{ item }}"
+    become: true
+    delegate_to: localhost
+    with_items: "{{ ip_addr.split(' ') }}"
+
