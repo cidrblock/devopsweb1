@@ -1,0 +1,11 @@
+- hosts: switches
+  gather_facts: False
+  vars:
+    ftp_server: 42.159.176.15
+  
+  tasks:
+  - name: Include the brocade upgrade role
+    include_role:
+      name: brocade_upgrade
+    vars:
+      ip_addr: "{{ inventory_hostname }}"

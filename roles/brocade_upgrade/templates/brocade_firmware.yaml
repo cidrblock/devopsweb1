@@ -1,0 +1,5 @@
+---
+- example: FOS      v7.4.2d
+  getval: '^FOS\s+(?P<version>\S+)'
+  result:
+    version: "{{ version }}"
